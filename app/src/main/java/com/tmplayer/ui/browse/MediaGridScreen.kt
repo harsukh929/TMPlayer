@@ -2567,13 +2567,14 @@ private fun MediaArt(
             )
             finished -> WatchedBadge(corner)
         }
-        // The top end corner: the caller's own mark, else on a poster the quality the name
-        // states, which a film's card shows where a video's carries it in its line of facts.
+        // The top end is reserved for the rating on posters; caller badges keep priority.
+        if (badge != null) {
+            Box(Modifier.align(Alignment.TopEnd).padding(inset)) { badge() }
+        }
+        // Keep the quality tag at the lower start so it never collides with the poster rating.
         val quality = item.qualityTags.firstOrNull()
-        when {
-            badge != null -> Box(Modifier.align(Alignment.TopEnd).padding(inset)) { badge() }
-            // Only on its own: two chips across a narrow poster would meet in the middle.
-            poster && !thumb && quality != null && waiting == null && !item.onDevice && !finished -> TileBadge(quality, Modifier.align(Alignment.TopEnd).padding(inset))
+        if (badge == null && poster && !thumb && quality != null && waiting == null && !item.onDevice && !finished) {
+            TileBadge(quality, Modifier.align(Alignment.BottomStart).padding(inset))
         }
 
         // Where playback stopped, as a line laid on the foot of the picture. Only with a saved
@@ -2582,12 +2583,18 @@ private fun MediaArt(
         if (fraction > 0f) {
             ProgressLine(fraction, Modifier.align(Alignment.BottomCenter), inset = if (compact) 6.dp else ProgressLineInset)
         }
-        // The bottom end corner: the title's one score, only when it is already on the device.
+        // Poster ratings load as their card enters the visible grid and sit at top end.
+        // Landscape tiles retain the cache-only score at bottom end.
         if (!thumb) {
             com.tmplayer.ui.online.CardScore(
                 meta.value,
-                Modifier.align(Alignment.BottomEnd).padding(end = inset, bottom = inset + if (fraction > 0f) 6.dp else 0.dp),
+                modifier = if (poster) {
+                    Modifier.align(Alignment.TopEnd).padding(inset)
+                } else {
+                    Modifier.align(Alignment.BottomEnd).padding(end = inset, bottom = inset + if (fraction > 0f) 6.dp else 0.dp)
+                },
                 compact = compact,
+                loadOnVisible = poster && badge == null,
             )
         }
         if (selected != null) {
