@@ -54,11 +54,15 @@ jobs:
       # the way the desktop runs them. Both are Kotlin Multiplatform libraries on AGP's own
       # plugin, which has no Android host tests here, so jvmTest is the whole of their suites.
       - name: Run core and ui tests
+        id: core_ui_tests
+        continue-on-error: true
         run: ./gradlew :core:jvmTest :ui:jvmTest
 
       # Debug only: the promo and release variants run the same test sources. Since AGP 9 only
       # the tested build type (debug) gets a unit test task at all, so this is every app test.
       - name: Run unit tests
+        id: app_unit_tests
+        continue-on-error: true
         run: ./gradlew :app:testDebugUnitTest
 
       - name: Build debug APK
@@ -83,6 +87,13 @@ jobs:
             app/build/reports/tests/
           retention-days: 14
           if-no-files-found: ignore
+
+      # Keep test failures visible, but only after the APK has had a chance to build and upload.
+      - name: Report test failures after APK upload
+        if: always() && (steps.core_ui_tests.outcome == 'failure' || steps.app_unit_tests.outcome == 'failure')
+        run: |
+          echo "One or more test suites failed. The APK build was still attempted and uploaded if successful."
+          exit 1
 
   # The desktop app, packaged exactly as a release packages it (the same composite actions under
   # .github/actions) and self-tested from every download, so a broken installer shows up on the
