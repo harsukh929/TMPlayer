@@ -193,26 +193,40 @@ fun MetaScoresRow(
 }
 
 /**
- * A card's one score ([MetaScore.cardPick]) with its site's mark, in a small dark pill for the
- * corner of a poster or a tile: only from what is already on this device
- * ([OnlineMetadata.cachedCardScore]), never a lookup per card, and nothing at all, no placeholder,
- * when none is kept. [meta] is the card's match, or null for none.
+ * A card's one score ([MetaScore.cardPick]) with its site's mark. Poster cards may ask for their
+ * extras once composed in the visible lazy grid; landscape tiles keep the old cache-only behaviour.
+ * [meta] is the card's match, or null for none.
  */
 @Composable
-fun CardScore(meta: MetaInfo?, modifier: Modifier = Modifier, compact: Boolean = false) {
+fun CardScore(
+    meta: MetaInfo?,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+    loadOnVisible: Boolean = false,
+) {
     meta ?: return
     val online = OnlineMetadata.current ?: return
     val settings by com.tmplayer.ui.components.rememberMetaSettings(online)
     if (!settings.enabled) return
     val known = remember(meta) { online.peekCardScore(meta) }
-    val score by produceState(known?.score, meta) {
-        if (known == null) value = withContext(Dispatchers.IO) { runCatching { online.cachedCardScore(meta) }.getOrNull() }
+    val score by produceState(known?.score, meta, loadOnVisible) {
+        if (known == null) {
+            value = withContext(Dispatchers.IO) {
+                runCatching {
+                    online.cachedCardScore(meta)
+                        ?: if (loadOnVisible) {
+                            online.extras(meta)?.let { extras ->
+                                MetaScore.cardPick(extras.withProviderScore(meta.provider).scores)
+                            }
+                        } else null
+                }.getOrNull()
+            }
+        }
     }
     val shown = score ?: return
     val style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
     Box(
         modifier
-            // A rounded fill, not a clip layer per card, as the tiles' other badges.
             .background(com.tmplayer.ui.components.TileBadgeFill, CircleShape)
             .padding(horizontal = if (compact) 6.dp else 8.dp, vertical = 3.dp),
     ) {
